@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Starting system-wide scan and remediation for CVE-2024-44133 indicators..."
+echo "Starting enhanced system-wide remediation for CVE-2024-44133 indicators..."
 
 # Function to check for suspicious processes
 check_processes() {
@@ -12,6 +12,31 @@ check_processes() {
             pkill -f "$process"
         fi
     done
+}
+
+# Function to secure Safari configurations for each user
+secure_safari_config() {
+    user_home=$1
+    safari_dir="$user_home/Library/Safari"
+    echo "Securing Safari configuration for user at $user_home..."
+
+    if [ -d "$safari_dir" ]; then
+        chmod -R 600 "$safari_dir"  # Restrict access to Safari configuration files
+        chflags uchg "$safari_dir"  # Lock the directory to prevent unauthorized changes
+        echo "Safari configuration secured for $user_home."
+    else
+        echo "No Safari configuration found for $user_home. Skipping."
+    fi
+}
+
+# Function to detect and log DSCL command misuse
+check_dscl_usage() {
+    echo "Checking for recent DSCL commands that could indicate TCC bypass attempts..."
+    dscl_logs=$(log show --predicate 'eventMessage contains "dscl"' --info --last 24h)
+    if [[ $dscl_logs == *"dscl"* ]]; then
+        echo "Warning: DSCL command detected. Inspect the following log entries for potential TCC bypass attempts:"
+        echo "$dscl_logs"
+    fi
 }
 
 # Function to check and reset Chrome preferences for each user
@@ -78,18 +103,20 @@ main() {
     for user_home in /Users/*; do
         if [ -d "$user_home" ] && [ "$user_home" != "/Users/Shared" ]; then
             echo "Scanning for user: $(basename "$user_home")"
+            secure_safari_config "$user_home"
             check_chrome_prefs "$user_home"
             secure_directories "$user_home"
             remove_suspicious_services "$user_home"
         fi
     done
     
-    # Check for processes and /tmp files system-wide
+    # Check for processes, DSCL usage, and /tmp files system-wide
     check_processes
+    check_dscl_usage
     check_tmp_files
     secure_system_binaries
 
-    echo "System-wide scan and remediation complete."
+    echo "Enhanced system-wide scan and remediation complete."
 }
 
 # Run the main function
