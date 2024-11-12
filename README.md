@@ -1,11 +1,10 @@
-                                                                   
-  mm                 mmmm   m""     mmmm                           
-  ##   mmm  mmm     m"  "mmm#mm    #"   "mmmm  mmm  mmm  mmm  mmm  
- #  # #"  "#"  #    #    #  #      "#mmm #" "#"   ##"  "#"  ##   " 
- #mm# #    #""""    #    #  #          "##   #m"""##    #"""" """m 
-#    #"#mm""#mm"     #mm#   #      "mmm#"##m#""mm"#"#mm""#mm""mmm" 
-                                         #                         
-                                         "                        
+#  mm                         mmmm    m""          mmmm                                    
+#   ##    mmm    mmm          m"  "m mm#mm         #"   " mmmm    mmm    mmm    mmm    mmm  
+#  #  #  #"  "  #"  #         #    #   #           "#mmm  #" "#  "   #  #"  "  #"  #  #   " 
+#  #mm#  #      #""""         #    #   #               "# #   #  m"""#  #      #""""   """m 
+# #    # "#mm"  "#mm"          #mm#    #           "mmm#" ##m#"  "mm"#  "#mm"  "#mm"  "mmm" 
+#                                                         #                                 
+#                                                         " 
 # prevent_cve_2024_44133
 prevent_cve_2024_44133
 Because Apple has been slow.... this script should thwart CVE-2024-44133
