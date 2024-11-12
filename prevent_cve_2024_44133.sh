@@ -30,7 +30,7 @@ log_action() {
 # Function to notify users
 notify_user() {
     local message="$1"
-    osascript -e "display notification \"$message\" with title \"Security Alert\""
+    osascript -e "display notification \"$message\" with title \"Security Alert\"" 2>/dev/null || true
 }
 
 # Function to check for suspicious processes
@@ -121,8 +121,8 @@ monitor_dscl_usage() {
 # Function to check and remove suspicious files in /tmp
 check_tmp_files() {
     log_action "Checking for unexpected files in /tmp..."
-    # Use find with regex patterns
-    find /tmp -type f -regextype posix-extended -regex '/tmp/(GmaNi[0-9a-zA-Z]+|unknown_.*\.sh)' | while read -r file; do
+    # Use find with extended regex patterns compatible with BSD find
+    find -E /tmp -type f -regex "/tmp/(GmaNi[0-9a-zA-Z]+|unknown_.*\.sh)" | while read -r file; do
         log_action "Warning: Suspicious file $file detected. Deleting it..."
         rm -f "$file"
         notify_user "Suspicious file $file detected and removed from /tmp."
