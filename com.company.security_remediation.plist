@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN"
+"http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.company.security_remediation</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/cve_2024_44133_remediation.sh</string>
+    </array>
+    <key>StartInterval</key>
+    <integer>86400</integer> <!-- Runs every 24 hours -->
+    <key>RunAtLoad</key>
+    <true/>
+</dict>
+</plist>
