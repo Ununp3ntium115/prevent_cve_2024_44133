@@ -14,28 +14,67 @@ check_processes() {
     done
 }
 
-# Function to secure Safari critical files against modification
-secure_safari_files() {
+# Function to secure Safari and other media configurations against modification
+secure_media_configs() {
     user_home=$1
+    media_config_dir="$user_home/Library/Preferences/com.apple.MediaToolbox.plist"
     safari_dir="$user_home/Library/Safari"
-    echo "Securing Safari critical files for user at $user_home..."
+    echo "Securing Safari and MediaToolbox configurations for user at $user_home..."
 
     if [ -d "$safari_dir" ]; then
-        # Files of interest
-        critical_files=("PerSitePreferences.db" "UserMediaPermissions.plist")
-        for file in "${critical_files[@]}"; do
-            file_path="$safari_dir/$file"
-            if [ -f "$file_path" ]; then
-                chmod 600 "$file_path"  # Restrict access to the file
-                chflags uchg "$file_path"  # Lock the file against changes
-                echo "Secured $file_path."
-            else
-                echo "$file_path not found for $user_home. Skipping."
-            fi
-        done
-    else
-        echo "No Safari configuration found for $user_home. Skipping."
+        chmod -R 600 "$safari_dir"  # Restrict access to Safari configuration files
+        chflags uchg "$safari_dir"  # Lock the directory against changes
+        echo "Safari configuration secured for $user_home."
     fi
+
+    if [ -f "$media_config_dir" ]; then
+        chmod 600 "$media_config_dir"  # Restrict access to MediaToolbox config file
+        chflags uchg "$media_config_dir"  # Lock file to prevent unauthorized modifications
+        echo "MediaToolbox configuration secured for $user_home."
+    else
+        echo "No MediaToolbox configuration found for $user_home. Skipping."
+    fi
+}
+
+# Function to check media and streaming filter settings
+monitor_media_filters() {
+    echo "Checking and enforcing secure media and streaming filter settings..."
+    media_filter_values=("AllowedCPC" "MediaValidation" "SupportedAudioFormat")
+
+    # For each filter, enforce expected values or log any unauthorized changes
+    for filter in "${media_filter_values[@]}"; do
+        filter_output=$(defaults read com.apple.MediaToolbox "$filter" 2>/dev/null)
+
+        case $filter in
+            "AllowedCPC")
+                # Expected setting for AllowedCPC
+                expected_value="0x3"
+                if [[ "$filter_output" != "$expected_value" ]]; then
+                    echo "Warning: AllowedCPC filter has been modified. Resetting to default..."
+                    defaults write com.apple.MediaToolbox "$filter" "$expected_value"
+                fi
+                ;;
+            "MediaValidation")
+                # Expected setting for MediaValidation (no unknown codecs allowed)
+                expected_value="NO"
+                if [[ "$filter_output" != "$expected_value" ]]; then
+                    echo "Warning: MediaValidation filter has been modified. Resetting to default..."
+                    defaults write com.apple.MediaToolbox "$filter" "$expected_value"
+                fi
+                ;;
+            "SupportedAudioFormat")
+                # Expected setting to disallow passthrough for unsupported formats
+                expected_values=("ac3IsDecodable:YES" "ec3IsDecodable:YES" "atmosIsDecodable:NO" "ac3CanPassthrough:NO" "ec3CanPassthrough:NO" "atmosCanPassthrough:NO")
+                for value in "${expected_values[@]}"; do
+                    if [[ "$filter_output" != *"$value"* ]]; then
+                        echo "Warning: SupportedAudioFormat filter has been modified. Resetting to defaults..."
+                        defaults write com.apple.MediaToolbox "$filter" -array "${expected_values[@]}"
+                        break
+                    fi
+                done
+                ;;
+        esac
+    done
 }
 
 # Function to detect and log DSCL command misuse
@@ -45,19 +84,6 @@ monitor_dscl_usage() {
     if [[ $dscl_logs == *"dscl"* ]]; then
         echo "Warning: DSCL command detected. Inspect the following log entries for potential TCC bypass attempts:"
         echo "$dscl_logs"
-    fi
-}
-
-# Function to monitor and reset Chrome preferences for each user
-monitor_chrome_prefs() {
-    user_home=$1
-    chrome_prefs="$user_home/Library/Application Support/Google/Chrome/Default/Preferences"
-    echo "Monitoring Chrome preferences for user at $user_home..."
-    if [ -f "$chrome_prefs" ]; then
-        if grep -q "Unexpected" "$chrome_prefs"; then
-            echo "Warning: Unauthorized changes detected in Chrome preferences at $chrome_prefs. Restoring permissions..."
-            chmod 644 "$chrome_prefs"
-        fi
     fi
 }
 
@@ -93,12 +119,12 @@ main() {
     for user_home in /Users/*; do
         if [ -d "$user_home" ] && [ "$user_home" != "/Users/Shared" ]; then
             echo "Scanning for user: $(basename "$user_home")"
-            secure_safari_files "$user_home"
-            monitor_chrome_prefs "$user_home"
+            secure_media_configs "$user_home"
         fi
     done
     
-    # Check for processes, DSCL usage, /tmp files, and Adload patterns system-wide
+    # Check media filters, processes, DSCL usage, /tmp files, and Adload patterns system-wide
+    monitor_media_filters
     check_processes
     monitor_dscl_usage
     check_tmp_files
