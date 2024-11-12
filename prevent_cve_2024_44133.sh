@@ -14,23 +14,32 @@ check_processes() {
     done
 }
 
-# Function to secure Safari configurations for each user
-secure_safari_config() {
+# Function to secure Safari critical files against modification
+secure_safari_files() {
     user_home=$1
     safari_dir="$user_home/Library/Safari"
-    echo "Securing Safari configuration for user at $user_home..."
+    echo "Securing Safari critical files for user at $user_home..."
 
     if [ -d "$safari_dir" ]; then
-        chmod -R 600 "$safari_dir"  # Restrict access to Safari configuration files
-        chflags uchg "$safari_dir"  # Lock the directory to prevent unauthorized changes
-        echo "Safari configuration secured for $user_home."
+        # Files of interest
+        critical_files=("PerSitePreferences.db" "UserMediaPermissions.plist")
+        for file in "${critical_files[@]}"; do
+            file_path="$safari_dir/$file"
+            if [ -f "$file_path" ]; then
+                chmod 600 "$file_path"  # Restrict access to the file
+                chflags uchg "$file_path"  # Lock the file against changes
+                echo "Secured $file_path."
+            else
+                echo "$file_path not found for $user_home. Skipping."
+            fi
+        done
     else
         echo "No Safari configuration found for $user_home. Skipping."
     fi
 }
 
 # Function to detect and log DSCL command misuse
-check_dscl_usage() {
+monitor_dscl_usage() {
     echo "Checking for recent DSCL commands that could indicate TCC bypass attempts..."
     dscl_logs=$(log show --predicate 'eventMessage contains "dscl"' --info --last 24h)
     if [[ $dscl_logs == *"dscl"* ]]; then
@@ -39,11 +48,11 @@ check_dscl_usage() {
     fi
 }
 
-# Function to check and reset Chrome preferences for each user
-check_chrome_prefs() {
+# Function to monitor and reset Chrome preferences for each user
+monitor_chrome_prefs() {
     user_home=$1
     chrome_prefs="$user_home/Library/Application Support/Google/Chrome/Default/Preferences"
-    echo "Checking Chrome preferences for user at $user_home..."
+    echo "Monitoring Chrome preferences for user at $user_home..."
     if [ -f "$chrome_prefs" ]; then
         if grep -q "Unexpected" "$chrome_prefs"; then
             echo "Warning: Unauthorized changes detected in Chrome preferences at $chrome_prefs. Restoring permissions..."
@@ -52,35 +61,7 @@ check_chrome_prefs() {
     fi
 }
 
-# Function to set permissions and remove suspicious directories
-secure_directories() {
-    user_home=$1
-    vulnerable_dir="$user_home/Library/Application Support/.17066225541972342347"
-    echo "Setting permissions for vulnerable directories for user at $user_home..."
-    if [ -d "$vulnerable_dir" ]; then
-        chmod -R 700 "$vulnerable_dir"
-    else
-        echo "Directory $vulnerable_dir not found for user at $user_home. Skipping."
-    fi
-}
-
-# Function to remove suspicious services
-remove_suspicious_services() {
-    user_home=$1
-    suspicious_services=("com.BasicIndex.service")
-    echo "Checking for suspicious services for user at $user_home..."
-    for service in "${suspicious_services[@]}"; do
-        service_path="$user_home/Library/Application Support/.17066225541972342347/Services/$service"
-        if [ -f "$service_path" ]; then
-            echo "Warning: Suspicious service $service detected at $service_path. Deleting..."
-            rm -rf "$service_path"
-        else
-            echo "Service $service not found for user at $user_home. Skipping."
-        fi
-    done
-}
-
-# Function to check for unexpected files in /tmp
+# Function to remove suspicious files in /tmp and set alerts for Adload behavior
 check_tmp_files() {
     echo "Checking for unexpected files in /tmp..."
     if [ -f "/tmp/GmaNi4v50ekNZSI" ]; then
@@ -97,24 +78,32 @@ secure_system_binaries() {
     echo "Skipping osascript modification due to SIP restrictions."
 }
 
+# Function to detect base64 decoding or unauthorized scripting attempts by Adload-like patterns
+monitor_adload_patterns() {
+    echo "Monitoring system logs for base64 decoding and scripting abuse patterns..."
+    log show --predicate '(eventMessage contains "base64") || (eventMessage contains "osascript")' --info --last 24h > /tmp/adload_patterns.log
+    if [[ -s /tmp/adload_patterns.log ]]; then
+        echo "Warning: Potential Adload behavior detected. Review the log at /tmp/adload_patterns.log for suspicious patterns."
+    fi
+}
+
 # Main function to loop over each user and apply checks
 main() {
     # Get list of all home directories in /Users (excluding system accounts)
     for user_home in /Users/*; do
         if [ -d "$user_home" ] && [ "$user_home" != "/Users/Shared" ]; then
             echo "Scanning for user: $(basename "$user_home")"
-            secure_safari_config "$user_home"
-            check_chrome_prefs "$user_home"
-            secure_directories "$user_home"
-            remove_suspicious_services "$user_home"
+            secure_safari_files "$user_home"
+            monitor_chrome_prefs "$user_home"
         fi
     done
     
-    # Check for processes, DSCL usage, and /tmp files system-wide
+    # Check for processes, DSCL usage, /tmp files, and Adload patterns system-wide
     check_processes
-    check_dscl_usage
+    monitor_dscl_usage
     check_tmp_files
     secure_system_binaries
+    monitor_adload_patterns
 
     echo "Enhanced system-wide scan and remediation complete."
 }
